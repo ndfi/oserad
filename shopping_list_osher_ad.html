@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>רשימת קניות אושר עד</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0f0f13;--surface:#1a1a22;--surface2:#22222e;--accent:#a855f7;--accent2:#7c3aed;--accent-glow:rgba(168,85,247,0.2);--text:#f0eeff;--muted:#8880aa;--done-text:#5a5a7a;--green:#22c55e;--r:14px;--sh:0 4px 24px rgba(0,0,0,0.5)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;direction:rtl}
+.app{max-width:480px;margin:0 auto;padding:0 0 120px}
+.header{padding:24px 16px 12px;display:flex;align-items:center;justify-content:space-between}
+.logo{font-size:20px;font-weight:900;letter-spacing:-0.5px;background:linear-gradient(135deg,#e879f9,#a855f7,#818cf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.map-btn{font-size:12px;color:var(--accent);background:rgba(168,85,247,0.12);border:1px solid rgba(168,85,247,0.3);border-radius:20px;padding:6px 12px;cursor:pointer;font-family:'Heebo',sans-serif;font-weight:700;transition:all .2s}
+.map-btn:hover{background:rgba(168,85,247,0.25)}
+
+/* Map Modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:200;display:none;align-items:flex-end;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal-box{background:var(--surface);border-radius:20px 20px 0 0;padding:20px 16px 40px;width:100%;max-width:480px;max-height:85vh;overflow-y:auto;animation:slideUp .25s ease}
+@keyframes slideUp{from{transform:translateY(40px);opacity:0}to{transform:translateY(0);opacity:1}}
+.modal-title{font-size:15px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;color:var(--text)}
+.modal-close{background:var(--surface2);border:1px solid #2e2e40;color:var(--muted);border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center}
+.store-map{display:grid;gap:4px;font-size:10px;text-align:center}
+.map-row{display:flex;gap:4px;justify-content:center}
+.map-cell{flex:1;padding:8px 4px;border-radius:8px;font-weight:700;min-width:0;line-height:1.3}
+.map-cell.top-wall{background:rgba(239,68,68,0.18);color:#fca5a5;border:1px solid rgba(239,68,68,0.3)}
+.map-cell.side-wall{background:rgba(251,146,60,0.15);color:#fdba74;border:1px solid rgba(251,146,60,0.3);writing-mode:vertical-rl;padding:12px 4px;min-width:28px;flex:0 0 28px}
+.map-cell.aisle{background:var(--surface2);color:var(--muted);border:1px solid #2a2a38}
+.map-cell.aisle.active{background:rgba(168,85,247,0.15);color:var(--accent);border-color:rgba(168,85,247,0.4)}
+.map-cell.entrance{background:rgba(34,197,94,0.12);color:#86efac;border:1px solid rgba(34,197,94,0.3)}
+.map-legend{margin-top:12px;display:flex;flex-wrap:wrap;gap:8px;font-size:11px}
+.legend-item{display:flex;align-items:center;gap:4px;color:var(--muted)}
+.legend-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+
+/* Counter */
+.counter-bar{margin:0 16px 12px;background:var(--surface);border-radius:var(--r);padding:14px 18px;display:flex;align-items:center;justify-content:space-between;border:1px solid #2a2a38;box-shadow:var(--sh)}
+.counter-text{font-size:15px;font-weight:700}
+.counter-text span{color:var(--accent);font-size:20px}
+.prog-wrap{display:flex;align-items:center;gap:8px}
+.prog-bar{width:90px;height:6px;background:#2a2a38;border-radius:3px;overflow:hidden}
+.prog-fill{height:100%;background:linear-gradient(90deg,var(--accent2),var(--accent));border-radius:3px;transition:width .4s}
+.prog-pct{font-size:12px;color:var(--muted);min-width:30px;text-align:left}
+
+/* Input */
+.input-section{margin:0 16px 14px;background:var(--surface);border-radius:var(--r);padding:16px;border:1px solid #2a2a38;transition:border-color .2s}
+.input-section:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
+.input-label{font-size:11px;font-weight:700;letter-spacing:1.5px;color:var(--muted);margin-bottom:8px;text-transform:uppercase}
+textarea.inp{width:100%;background:var(--surface2);border:1px solid #2e2e40;border-radius:10px;color:var(--text);font-family:'Heebo',sans-serif;font-size:15px;padding:10px 12px;resize:none;min-height:72px;outline:none;direction:rtl}
+textarea.inp::placeholder{color:var(--muted)}
+textarea.inp:focus{border-color:var(--accent)}
+.hint{font-size:11px;color:var(--muted);margin-top:6px}
+.btn-row{display:flex;gap:8px;margin-top:10px}
+.btn-p{flex:1;background:linear-gradient(135deg,var(--accent2),var(--accent));color:#fff;border:none;border-radius:10px;padding:11px;font-family:'Heebo',sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:opacity .2s,transform .1s;box-shadow:0 4px 14px var(--accent-glow)}
+.btn-p:active{transform:scale(0.97);opacity:.9}
+.btn-p:disabled{opacity:.5;cursor:not-allowed}
+.btn-s{background:var(--surface2);color:var(--muted);border:1px solid #2e2e40;border-radius:10px;padding:11px 12px;font-family:'Heebo',sans-serif;font-size:14px;cursor:pointer;transition:all .2s}
+.btn-s:hover{border-color:var(--accent);color:var(--accent)}
+
+/* AI badge */
+.ai-badge{display:none;align-items:center;gap:5px;background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.25);border-radius:20px;padding:5px 12px;font-size:11px;color:var(--accent);margin:0 16px 10px;font-weight:600}
+.ai-badge.show{display:inline-flex}
+
+/* Section header */
+.sec-hdr{display:flex;align-items:center;gap:8px;padding:14px 18px 6px}
+.sec-icon{font-size:16px}
+.sec-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted)}
+.sec-cnt{background:var(--accent);color:#fff;font-size:11px;font-weight:700;padding:2px 7px;border-radius:10px;margin-right:auto}
+
+/* Zone group */
+.zone-group{margin:0 16px 6px;border-radius:var(--r);overflow:visible;border:1px solid #2a2a38;box-shadow:var(--sh)}
+.zone-hdr{display:flex;align-items:center;gap:8px;padding:9px 14px;font-size:12px;font-weight:700;color:var(--muted);background:var(--surface2);border-bottom:1px solid #2a2a38;border-radius:var(--r) var(--r) 0 0}
+.zdot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.zstep{margin-right:auto;font-size:10px;color:#3a3a50;font-weight:400}
+.zone-body{background:var(--surface);border-radius:0 0 var(--r) var(--r);min-height:48px}
+.zone-body.drag-over{background:rgba(168,85,247,0.08);box-shadow:inset 0 0 0 2px rgba(168,85,247,0.4)}
+
+/* Item row */
+.item-row{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--surface);border-bottom:1px solid #1e1e28;transition:background .2s,opacity .2s;cursor:grab;-webkit-tap-highlight-color:transparent;user-select:none;position:relative}
+.item-row:last-child{border-bottom:none}
+.item-row:active{background:var(--surface2)}
+.item-row.dragging{opacity:.4;cursor:grabbing}
+.item-row.drag-target{border-top:2px solid var(--accent)}
+.item-row.done{opacity:.4}
+.item-row.done .iname{text-decoration:line-through;color:var(--done-text)}
+.drag-handle{font-size:13px;color:#3a3a50;cursor:grab;padding:0 2px;flex-shrink:0}
+.chkbox{width:22px;height:22px;border-radius:6px;border:2px solid #3a3a50;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s;cursor:pointer}
+.item-row.done .chkbox{background:var(--green);border-color:var(--green)}
+.chk-icon{color:white;font-size:12px;display:none}
+.item-row.done .chk-icon{display:block}
+.iname{flex:1;font-size:15px;font-weight:500;color:var(--text);transition:color .2s}
+.icat{font-size:10px;color:var(--muted);background:var(--surface2);padding:2px 7px;border-radius:7px;border:1px solid #2a2a38}
+.unk-badge{font-size:10px;color:#f59e0b;background:rgba(245,158,11,.1);padding:2px 7px;border-radius:7px;border:1px solid rgba(245,158,11,.2)}
+
+/* Empty state */
+.empty{text-align:center;padding:50px 24px;color:var(--muted)}
+.empty-icon{font-size:46px;margin-bottom:12px;opacity:.6}
+.empty-t{font-size:17px;font-weight:700;margin-bottom:8px;color:var(--text)}
+.empty-s{font-size:13px;line-height:1.6}
+
+/* Done divider */
+.done-div{display:flex;align-items:center;gap:10px;padding:14px 18px 6px}
+.done-line{flex:1;height:1px;background:#2a2a38}
+.done-lbl{font-size:12px;color:var(--done-text);font-weight:600}
+
+/* FAB */
+.fab{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--surface2);color:var(--muted);border:1px solid #2e2e40;border-radius:30px;padding:11px 22px;font-family:'Heebo',sans-serif;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 8px 30px rgba(0,0,0,.6);z-index:100;display:none;gap:6px;align-items:center;transition:all .2s}
+.fab.show{display:flex}
+.fab:hover{border-color:#ff4d6d;color:#ff4d6d}
+
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.item-row{animation:fadeIn .2s ease both}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- Map Modal -->
+<div class="modal-overlay" id="mapModal" onclick="closeMap(event)">
+  <div class="modal-box">
+    <div class="modal-title">
+      <span>🏪 מפת הסופר — אושר עד</span>
+      <button class="modal-close" onclick="document.getElementById('mapModal').classList.remove('open')">✕</button>
+    </div>
+    <div class="store-map">
+      <div class="map-row">
+        <div class="map-cell top-wall" style="flex:2">🥩 עופות-בשר</div>
+        <div style="flex:.3"></div>
+        <div class="map-cell top-wall" style="flex:2">🌱 ירקות עליים</div>
+      </div>
+      <div class="map-row" style="margin-top:4px">
+        <div class="map-cell side-wall">פסטרמות</div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:4px">
+          <div class="map-row">
+            <div class="map-cell aisle">🥤 משקאות</div>
+            <div class="map-cell aisle">⚡ חשמל</div>
+            <div class="map-cell aisle">🐔 עוף קפוא</div>
+            <div class="map-cell aisle">🥐 בצקים</div>
+            <div class="map-cell aisle">🧊 קפואים</div>
+            <div class="map-cell aisle">🥬 ירקות</div>
+            <div class="map-cell aisle">🥬 ירקות</div>
+          </div>
+          <div class="map-row" style="margin-top:10px">
+            <div class="map-cell aisle">🥣 דגני בוקר</div>
+            <div class="map-cell aisle">🧻 נייר</div>
+            <div class="map-cell aisle">📦 חד פעמי</div>
+            <div class="map-cell aisle active">🍰 עוגות</div>
+            <div class="map-cell aisle">🫙 יסוד</div>
+            <div class="map-cell aisle">🌿 תבלינים</div>
+            <div class="map-cell aisle">🍎 פירות</div>
+          </div>
+          <div class="map-row" style="margin-top:10px">
+            <div class="map-cell aisle">🥣 דגני בוקר</div>
+            <div class="map-cell aisle">🧻 נייר</div>
+            <div class="map-cell aisle">📦 חד פעמי</div>
+            <div class="map-cell aisle">🧺 טקסטיל</div>
+            <div class="map-cell aisle">🧴 טואלטיקה</div>
+            <div class="map-cell aisle">🧹 ניקיון</div>
+            <div class="map-cell aisle">🧼 כביסה</div>
+          </div>
+        </div>
+        <div class="map-cell side-wall">ירקות</div>
+      </div>
+      <div class="map-row" style="margin-top:8px">
+        <div class="map-cell entrance" style="flex:1">⚡ חשמל</div>
+        <div class="map-cell entrance" style="flex:2">🛒 קופות — יציאה ↓</div>
+        <div class="map-cell entrance" style="flex:1">🏷️ מוצרים משתנים</div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px">← כניסה מימין</div>
+    </div>
+    <div class="map-legend">
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(239,68,68,.4)"></div>קיר עליון</div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(251,146,60,.3)"></div>קיר צד</div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(168,85,247,.25)"></div>פריט ברשימה</div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(34,197,94,.2)"></div>כניסה/יציאה</div>
+    </div>
+  </div>
+</div>
+
+<!-- Header -->
+<div class="header">
+  <div class="logo">🛒 רשימת קניות אושר עד</div>
+  <button class="map-btn" onclick="document.getElementById('mapModal').classList.add('open')">🗺️ המפה שלי</button>
+</div>
+
+<!-- Counter -->
+<div class="counter-bar" id="counterBar" style="display:none">
+  <div class="counter-text">נאספו <span id="doneCount">0</span> מתוך <span id="totalCount">0</span></div>
+  <div class="prog-wrap">
+    <div class="prog-bar"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
+    <div class="prog-pct" id="progPct">0%</div>
+  </div>
+</div>
+
+<!-- Input -->
+<div class="input-section">
+  <div class="input-label">📝 הכנסת רשימת קניות</div>
+  <textarea class="inp" id="inputArea" placeholder="הדבק כאן את הרשימה...&#10;למשל: חלב, מלפפון, שמפו, קורנפלקס"></textarea>
+  <div class="hint">💡 ניתן להפריד בפסיק, שורה חדשה, או רווח</div>
+  <div class="btn-row">
+    <button class="btn-p" id="sortBtn" onclick="processListAI()">✨ מיין לפי מסלול חכם</button>
+    <button class="btn-s" onclick="document.getElementById('inputArea').value=''">🗑️</button>
+  </div>
+</div>
+
+<div class="ai-badge" id="aiBadge"><span>⚡</span> מסלול אופטימלי · <span id="zoneCount">0</span> אזורים · <small style="opacity:.7">גרור מוצרים בין קטגוריות</small></div>
+
+<div id="listContainer"></div>
+
+<button class="fab" id="clearFab" onclick="clearAll()">🗑️ נקה הכל</button>
+
+</div>
+<script>
+const ZONE_ORDER=[
+  {id:'entrance_right',label:'כניסה — מוצרים משתנים',icon:'🚪',color:'#f59e0b',step:'שלב 1'},
+  {id:'row1_right',label:'שורה 1 — ירקות (קיר ימין)',icon:'🥬',color:'#22c55e',step:'שלב 2'},
+  {id:'row1_fruits',label:'שורה 1 — פירות',icon:'🍎',color:'#f97316',step:'שלב 3'},
+  {id:'row1_spices',label:'שורה 1 — תבלינים',icon:'🌿',color:'#84cc16',step:'שלב 4'},
+  {id:'row1_basic',label:'שורה 1 — מוצרי יסוד',icon:'🫙',color:'#06b6d4',step:'שלב 5'},
+  {id:'row1_cakes',label:'שורה 1 — עוגות ועוגיות',icon:'🍰',color:'#ec4899',step:'שלב 6'},
+  {id:'row1_disposable',label:'שורה 1 — חד פעמי / נייר',icon:'🧻',color:'#8b5cf6',step:'שלב 7'},
+  {id:'row1_cereals',label:'שורה 1 — דגני בוקר',icon:'🥣',color:'#d97706',step:'שלב 8'},
+  {id:'row2_veggies',label:'שורה 2 — ירקות',icon:'🥦',color:'#16a34a',step:'שלב 9'},
+  {id:'row2_frozen',label:'שורה 2 — קפואים / עופות',icon:'🧊',color:'#3b82f6',step:'שלב 10'},
+  {id:'row2_dough',label:'שורה 2 — בצקים קפואים',icon:'🥐',color:'#a78bfa',step:'שלב 11'},
+  {id:'row2_drinks',label:'שורה 2 — משקאות',icon:'🥤',color:'#0ea5e9',step:'שלב 12'},
+  {id:'top_greens',label:'קיר עליון — ירקות עליים',icon:'🌱',color:'#4ade80',step:'שלב 13'},
+  {id:'top_meat',label:'קיר עליון — עופות ובשר',icon:'🥩',color:'#ef4444',step:'שלב 14'},
+  {id:'top_cold',label:'קיר שמאל — פסטרמות / קר',icon:'🧀',color:'#fb923c',step:'שלב 15'},
+  {id:'row3_washing',label:'שורה 3 — כביסה / ניקיון',icon:'🧹',color:'#a855f7',step:'שלב 16'},
+  {id:'row3_hygiene',label:'שורה 3 — טואלטיקה',icon:'🧴',color:'#db2777',step:'שלב 17'},
+  {id:'row3_textile',label:'שורה 3 — טקסטיל',icon:'🧺',color:'#7c3aed',step:'שלב 18'},
+  {id:'row3_paper',label:'שורה 3 — נייר / חד פעמי',icon:'📦',color:'#6366f1',step:'שלב 19'},
+  {id:'row3_cereals2',label:'שורה 3 — לחם / אפייה',icon:'🍞',color:'#c2410c',step:'שלב 20'},
+  {id:'entrance_elec',label:'כניסה — מוצרי חשמל',icon:'⚡',color:'#fbbf24',step:'שלב 21'},
+  {id:'unknown',label:'לא זוהה',icon:'❓',color:'#6b7280',step:''},
+];
+
+const KMAP={
+  row1_right:['מלפפון','עגבנייה','עגבניה','גזר','חסה','כרוב','קישוא','סלרי','כרובית','ברוקולי','פלפל','בצל','שום','בטטה','תפוח אדמה','תפוחי אדמה'],
+  row1_fruits:['תפוח','בננה','אבוקדו','תות','ענב','ענבים','מנגו','אבטיח','מלון','קיווי','אגס','שזיף','תפוז','לימון','אפרסק','נקטרינה','רימון'],
+  row1_spices:['מלח','פלפל','כמון','פפריקה','כורכום','קינמון','זעתר','בזיל','אורגנו','עלי דפנה','תבלין','תבלינים','חרדל','סויה','רוטב'],
+  row1_basic:['אורז','פסטה','קמח','סוכר','שמן','חומץ','שמרים','אבקת אפייה','דבש','ריבה','טחינה','חומוס','עדשים','שעועית','קטניות','ספגטי','מקרוני'],
+  row1_cakes:['עוגיות','ביסקוויט','שוקולד','סוכריות','ממתקים','עוגה','קרקרים','חטיף','גרנולה','נוטלה','קרם','לוטוס'],
+  row1_disposable:['מפיות','צלחות חד פעמי','כוסות חד פעמי','שקיות','ניילון','אלומיניום','נייר אפייה'],
+  row1_cereals:['קורנפלקס','גרנולה','שיבולת שועל','אוטמיל','קוואקר','מוסלי'],
+  row2_veggies:['תרד','פטרוזיליה','כוסברה','נענע','אורוגולה','רוקט','עשבי תיבול'],
+  row2_frozen:['עוף קפוא','פרגית קפוא','שניצל קפוא','דגים קפואים','פיצה קפואה','ירקות קפואים','בורגר קפוא','טונה','סרדינים'],
+  row2_dough:['בצק עלים','בצק פילו','בצק','בורקס קפוא'],
+  row2_drinks:['מים','מיץ','קולה','פנטה','ספרייט','סודה','בירה','יין','לימונדה','אנרגי','רד בול'],
+  top_greens:['עשבי תיבול טרי','ג\'ינג\'ר','כורכום טרי'],
+  top_meat:['עוף','חזה עוף','שוק עוף','כנפיים','בשר','סטייק','אנטריקוט','צלעות','קציצות','המבורגר','כבש','הודו'],
+  top_cold:['פסטרמה','נקניק','סלמי','בולוניה','גבינה','לבן','שמנת','יוגורט','קוטג','חלב','מוצרלה','פטה','ביצה','ביצים'],
+  row3_washing:['אבקת כביסה','נוזל כביסה','מרכך','אקונומיקה','ממחה','מטאטא','ספוג','פיירי','סבון כלים','וויפר','דטרגנט'],
+  row3_hygiene:['שמפו','מרכך שיער','סבון','ג\'ל רחצה','קרם','דאודורנט','משחת שיניים','מברשת שיניים'],
+  row3_textile:['מגבת','מגבות','סדין','ציפית','שמיכה','כרית','וילון','מפה'],
+  row3_paper:['נייר טואלט','טישו','ממחטות','נייר מגבת','חיתולים'],
+  row3_cereals2:['לחם','פיתה','בגט','לחמנייה','לחמניה','לחמניות','לחמניות'],
+  entrance_elec:['פנס','סוללה','מטען','כבל','נורה','שקע','תקע'],
+};
+
+let items=[];
+let dragItem=null,dragZone=null;
+
+function loadState(){
+  try{const d=JSON.parse(localStorage.getItem('osher_ad_v3')||'{}');items=d.items||[];}catch(e){items=[];}
+  render();
+}
+function saveState(){localStorage.setItem('osher_ad_v3',JSON.stringify({items}));}
+
+function classifyItem(name){
+  const n=name.trim().toLowerCase();
+  for(const[zoneId,kws]of Object.entries(KMAP)){
+    for(const kw of kws){
+      if(n.includes(kw.toLowerCase())||kw.toLowerCase().includes(n))return zoneId;
+    }
+  }
+  return'unknown';
+}
+
+function parseInput(raw){
+  return raw.split(/[\n,،\t]+/).map(s=>s.trim()).filter(s=>s.length>0);
+}
+
+async function processListAI(){
+  const raw=document.getElementById('inputArea').value;
+  if(!raw.trim())return;
+  const names=parseInput(raw);
+  if(!names.length)return;
+  const btn=document.getElementById('sortBtn');
+  btn.textContent='⏳ מסווג...';btn.disabled=true;
+  let aiResult=null;
+  try{
+    const zones=ZONE_ORDER.map(z=>z.id).join(', ');
+    const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:`Classify each Israeli supermarket product into exactly one zone: ${zones}\nProducts: ${names.join(', ')}\nRespond ONLY as JSON array: [{"name":"...","zone":"..."},...]\nNo markdown.`}]})});
+    const d=await r.json();
+    const txt=(d.content?.[0]?.text||'').replace(/```json|```/g,'').trim();
+    aiResult=JSON.parse(txt);
+  }catch(e){}
+
+  const newItems=names.map((name,i)=>{
+    let zone='unknown';
+    if(aiResult){
+      const f=aiResult.find(r=>r.name&&(name.toLowerCase().includes(r.name.toLowerCase())||r.name.toLowerCase().includes(name.toLowerCase())));
+      if(f)zone=f.zone;
+      else if(aiResult[i])zone=aiResult[i].zone;
+    }
+    if(zone==='unknown')zone=classifyItem(name);
+    return{id:Date.now()+Math.random(),name,zone,done:false};
+  });
+
+  items=[...newItems,...items.filter(it=>!names.includes(it.name))];
+  saveState();render();
+  btn.textContent='✨ מיין לפי מסלול חכם';btn.disabled=false;
+}
+
+function toggleItem(id){
+  const it=items.find(i=>i.id===id);
+  if(it){it.done=!it.done;saveState();render();}
+}
+
+function moveItemToZone(itemId,newZone){
+  const it=items.find(i=>i.id===itemId);
+  if(it){it.zone=newZone;saveState();render();}
+}
+
+function clearAll(){
+  if(confirm('למחוק את כל רשימת הקניות?')){items=[];saveState();render();}
+}
+
+function closeMap(e){
+  if(e.target===document.getElementById('mapModal'))
+    document.getElementById('mapModal').classList.remove('open');
+}
+
+// ===== DRAG AND DROP =====
+function setupDrag(){
+  document.querySelectorAll('.item-row[data-id]').forEach(row=>{
+    row.addEventListener('dragstart',e=>{
+      dragItem=row.dataset.id;
+      dragZone=row.dataset.zone;
+      setTimeout(()=>row.classList.add('dragging'),0);
+      e.dataTransfer.effectAllowed='move';
+    });
+    row.addEventListener('dragend',()=>{
+      row.classList.remove('dragging');
+      document.querySelectorAll('.drag-target').forEach(el=>el.classList.remove('drag-target'));
+      document.querySelectorAll('.zone-body.drag-over').forEach(el=>el.classList.remove('drag-over'));
+    });
+    row.addEventListener('dragover',e=>{
+      e.preventDefault();
+      document.querySelectorAll('.drag-target').forEach(el=>el.classList.remove('drag-target'));
+      row.classList.add('drag-target');
+    });
+    row.addEventListener('drop',e=>{
+      e.preventDefault();
+      if(dragItem&&dragItem!==row.dataset.id){
+        const targetZone=row.dataset.zone;
+        const dragItemObj=items.find(i=>String(i.id)===dragItem);
+        const targetItemObj=items.find(i=>String(i.id)===row.dataset.id);
+        if(dragItemObj&&targetItemObj){
+          dragItemObj.zone=targetZone;
+          const di=items.indexOf(dragItemObj),ti=items.indexOf(targetItemObj);
+          items.splice(di,1);
+          items.splice(items.indexOf(targetItemObj),0,dragItemObj);
+          saveState();render();
+        }
+      }
+      dragItem=null;
+    });
+  });
+
+  document.querySelectorAll('.zone-body').forEach(body=>{
+    body.addEventListener('dragover',e=>{
+      e.preventDefault();
+      body.classList.add('drag-over');
+    });
+    body.addEventListener('dragleave',()=>body.classList.remove('drag-over'));
+    body.addEventListener('drop',e=>{
+      e.preventDefault();
+      body.classList.remove('drag-over');
+      const targetZone=body.dataset.zone;
+      if(dragItem&&targetZone){
+        moveItemToZone(dragItem,targetZone);
+      }
+      dragItem=null;
+    });
+  });
+}
+
+// Touch drag support
+let touchDragItem=null,touchClone=null,touchStartZone=null;
+function setupTouchDrag(){
+  document.querySelectorAll('.item-row[data-id]').forEach(row=>{
+    row.addEventListener('touchstart',e=>{
+      const touch=e.touches[0];
+      touchDragItem=row.dataset.id;
+      touchStartZone=row.dataset.zone;
+      touchClone=row.cloneNode(true);
+      touchClone.style.cssText=`position:fixed;width:${row.offsetWidth}px;opacity:0.85;z-index:999;pointer-events:none;left:${touch.clientX-row.offsetWidth/2}px;top:${touch.clientY-20}px;border-radius:10px;background:#22222e;`;
+      document.body.appendChild(touchClone);
+      row.style.opacity='0.3';
+    },{passive:true});
+
+    row.addEventListener('touchmove',e=>{
+      if(!touchClone)return;
+      const touch=e.touches[0];
+      touchClone.style.left=(touch.clientX-touchClone.offsetWidth/2)+'px';
+      touchClone.style.top=(touch.clientY-20)+'px';
+      document.querySelectorAll('.zone-body').forEach(b=>b.classList.remove('drag-over'));
+      const el=document.elementFromPoint(touch.clientX,touch.clientY);
+      const zb=el?.closest('.zone-body');
+      if(zb)zb.classList.add('drag-over');
+    },{passive:true});
+
+    row.addEventListener('touchend',e=>{
+      if(!touchClone)return;
+      const touch=e.changedTouches[0];
+      const el=document.elementFromPoint(touch.clientX,touch.clientY);
+      const zb=el?.closest('.zone-body');
+      const targetZone=zb?.dataset.zone;
+      if(targetZone&&targetZone!==touchStartZone){
+        moveItemToZone(touchDragItem,targetZone);
+      } else {
+        render();
+      }
+      document.querySelectorAll('.zone-body').forEach(b=>b.classList.remove('drag-over'));
+      touchClone.remove();
+      touchClone=null;
+      touchDragItem=null;
+    },{passive:true});
+  });
+}
+
+function render(){
+  const ctr=document.getElementById('counterBar');
+  const fab=document.getElementById('clearFab');
+  const badge=document.getElementById('aiBadge');
+  const cont=document.getElementById('listContainer');
+
+  if(!items.length){
+    ctr.style.display='none';fab.classList.remove('show');badge.classList.remove('show');
+    cont.innerHTML=`<div class="empty"><div class="empty-icon">🛒</div><div class="empty-t">הרשימה ריקה</div><div class="empty-s">הדבק את רשימת הקניות שלך למעלה<br>ולחץ על "מיין לפי מסלול חכם"</div></div>`;
+    return;
+  }
+
+  const done=items.filter(i=>i.done).length;
+  const total=items.length;
+  const pct=total?Math.round(done/total*100):0;
+  document.getElementById('doneCount').textContent=done;
+  document.getElementById('totalCount').textContent=total;
+  document.getElementById('progFill').style.width=pct+'%';
+  document.getElementById('progPct').textContent=pct+'%';
+  ctr.style.display='flex';fab.classList.add('show');
+
+  const active=items.filter(i=>!i.done);
+  const doneItems=items.filter(i=>i.done);
+  const groups={};
+  for(const it of active){if(!groups[it.zone])groups[it.zone]=[];groups[it.zone].push(it);}
+  const presentZones=ZONE_ORDER.filter(z=>groups[z.id]?.length);
+  document.getElementById('zoneCount').textContent=presentZones.length;
+  badge.classList.toggle('show',presentZones.length>0);
+
+  let html='';
+  if(active.length){
+    html+=`<div class="sec-hdr"><span class="sec-icon">🗺️</span><span class="sec-title">מסלול קניות</span><span class="sec-cnt">${active.length}</span></div>`;
+    for(const zone of ZONE_ORDER){
+      const zItems=groups[zone.id];
+      if(!zItems?.length)continue;
+      html+=`<div class="zone-group"><div class="zone-hdr"><div class="zdot" style="background:${zone.color}"></div><span>${zone.icon} ${zone.label}</span>${zone.step?`<span class="zstep">${zone.step}</span>`:''}</div><div class="zone-body" data-zone="${zone.id}">`;
+      for(const it of zItems){
+        html+=`<div class="item-row" data-id="${it.id}" data-zone="${zone.id}" draggable="true">
+          <div class="drag-handle">⠿</div>
+          <div class="chkbox" onclick="event.stopPropagation();toggleItem(${it.id})"><span class="chk-icon">✓</span></div>
+          <span class="iname">${esc(it.name)}</span>
+          <span class="icat">${zone.icon}</span>
+        </div>`;
+      }
+      html+=`</div></div>`;
+    }
+  }
+
+  if(doneItems.length){
+    html+=`<div class="done-div"><div class="done-line"></div><div class="done-lbl">✅ נאספו (${doneItems.length})</div><div class="done-line"></div></div>`;
+    html+=`<div class="zone-group"><div class="zone-body" data-zone="done">`;
+    for(const it of doneItems){
+      html+=`<div class="item-row done" data-id="${it.id}" data-zone="done">
+        <div class="drag-handle" style="opacity:.3">⠿</div>
+        <div class="chkbox" onclick="event.stopPropagation();toggleItem(${it.id})"><span class="chk-icon">✓</span></div>
+        <span class="iname">${esc(it.name)}</span>
+      </div>`;
+    }
+    html+=`</div></div>`;
+  }
+
+  cont.innerHTML=html;
+  setupDrag();
+  setupTouchDrag();
+}
+
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+loadState();
+</script>
+</body>
+</html>
