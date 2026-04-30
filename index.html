@@ -263,6 +263,50 @@ textarea:focus { border-color: var(--acc); }
 .mc-enter { background: rgba(34,197,94,.1); color: #86efac; border: 1px solid rgba(34,197,94,.22); }
 .map-note { text-align: center; font-size: 10px; color: var(--mut); margin-top: 6px; }
 
+/* ──── CATEGORY PICKER MODAL ──── */
+.cat-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.65); z-index: 300;
+  display: none; align-items: flex-end; justify-content: center;
+  backdrop-filter: blur(2px);
+}
+.cat-overlay.open { display: flex; }
+.cat-sheet {
+  background: var(--s1); border-radius: 22px 22px 0 0;
+  padding: 16px 14px 40px; width: 100%; max-width: 480px;
+  max-height: 80dvh; overflow-y: auto;
+  animation: slideUp .22s ease;
+}
+.cat-sheet-top {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 6px;
+}
+.cat-sheet-title { font-size: 13px; font-weight: 700; color: var(--mut); text-transform: uppercase; letter-spacing: 1px; }
+.cat-sheet-close {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--s2); border: 1px solid var(--brd); color: var(--mut);
+  font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.cat-item-name { font-size: 15px; font-weight: 700; color: var(--txt); padding: 6px 0 12px; border-bottom: 1px solid var(--brd); margin-bottom: 10px; }
+.cat-list { display: flex; flex-direction: column; gap: 4px; }
+.cat-option {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px; border-radius: var(--r-sm);
+  background: var(--s2); border: 1px solid var(--brd);
+  cursor: pointer; font-size: 14px; font-weight: 500; color: var(--txt);
+  transition: background .15s, border-color .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.cat-option:active { background: var(--s3); }
+.cat-option.current { border-color: var(--acc); background: rgba(168,85,247,.1); color: var(--acc); }
+.cat-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.cat-step { margin-right: auto; font-size: 11px; color: var(--mut); }
+
+/* item-tag clickable */
+.item-tag, .item-unk {
+  cursor: pointer; transition: background .15s, border-color .15s;
+}
+.item-tag:active, .item-unk:active { border-color: var(--acc); }
+
 /* Animations */
 @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 .item { animation: fadeIn .18s ease both; }
@@ -272,6 +316,18 @@ textarea:focus { border-color: var(--acc); }
 
 <!-- Ghost element for drag -->
 <div id="drag-ghost"></div>
+
+<!-- Category Picker Sheet -->
+<div class="cat-overlay" id="catOverlay" onclick="if(event.target===this)closeCatPicker()">
+  <div class="cat-sheet">
+    <div class="cat-sheet-top">
+      <span class="cat-sheet-title">העבר לקטגוריה</span>
+      <button class="cat-sheet-close" onclick="closeCatPicker()">✕</button>
+    </div>
+    <div class="cat-item-name" id="catItemName"></div>
+    <div class="cat-list" id="catList"></div>
+  </div>
+</div>
 
 <!-- Map Modal -->
 <div class="overlay" id="mapOverlay" onclick="if(event.target===this)closeMap()">
@@ -364,7 +420,7 @@ textarea:focus { border-color: var(--acc); }
       </div>
     </div>
 
-    <div class="ai-badge" id="aiBadge">⚡ <span id="zoneN">0</span> אזורים · לחץ לאיסוף · גרור להעברה</div>
+    <div class="ai-badge" id="aiBadge">⚡ <span id="zoneN">0</span> אזורים · ✓ לסימון · 🏷️ להעברת קטגוריה</div>
 
     <div id="listEl"></div>
 
@@ -620,11 +676,15 @@ function render() {
 }
 
 function itemHTML(it, zone, isDone = false) {
-  const tag = isDone
-    ? ''
-    : zone?.id === 'unknown'
-      ? `<span class="item-unk">❓</span>`
-      : `<span class="item-tag">${zone.icon}</span>`;
+  const idNum = it.id;
+  let tag = '';
+  if (!isDone) {
+    if (zone?.id === 'unknown') {
+      tag = `<span class="item-unk" onclick="event.stopPropagation();openCatPicker(${idNum})" title="שנה קטגוריה">❓ שנה</span>`;
+    } else {
+      tag = `<span class="item-tag" onclick="event.stopPropagation();openCatPicker(${idNum})" title="שנה קטגוריה">${zone.icon} ▾</span>`;
+    }
+  }
 
   return `<div class="item${isDone ? ' done' : ''}" data-id="${it.id}" data-zone="${it.zone}">
     <div class="drag-handle" data-handle="1">⠿</div>
@@ -639,15 +699,51 @@ function itemHTML(it, zone, isDone = false) {
 function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 /* ═══════════════════════════════════════════
+   CATEGORY PICKER
+═══════════════════════════════════════════ */
+let pickerItemId = null;
+
+function openCatPicker(itemId) {
+  pickerItemId = itemId;
+  const it = items.find(i => i.id === itemId);
+  if (!it) return;
+
+  document.getElementById('catItemName').textContent = it.name;
+
+  const list = document.getElementById('catList');
+  list.innerHTML = ZONES.filter(z => z.id !== 'unknown').map(z => `
+    <div class="cat-option${it.zone === z.id ? ' current' : ''}" onclick="pickZone('${z.id}')">
+      <div class="cat-dot" style="background:${z.color}"></div>
+      <span>${z.icon} ${z.label}</span>
+      ${z.step ? `<span class="cat-step">שלב ${z.step}</span>` : ''}
+    </div>
+  `).join('');
+
+  document.getElementById('catOverlay').classList.add('open');
+}
+
+function pickZone(zoneId) {
+  if (pickerItemId !== null) {
+    moveToZone(pickerItemId, zoneId);
+  }
+  closeCatPicker();
+}
+
+function closeCatPicker() {
+  document.getElementById('catOverlay').classList.remove('open');
+  pickerItemId = null;
+}
+
+/* ═══════════════════════════════════════════
    TOUCH DRAG-AND-DROP
-   Long-press (400ms) → drag → drop on zone
+   Long-press (420ms) → drag → drop on zone
+   Robust cleanup prevents stuck state
 ═══════════════════════════════════════════ */
 let drag = {
   active: false,
   itemId: null,
   fromZone: null,
   el: null,
-  ghost: null,
   holdTimer: null,
   startX: 0,
   startY: 0,
@@ -656,11 +752,18 @@ let drag = {
 
 function attachTouchDrag() {
   document.querySelectorAll('.item[data-id]').forEach(row => {
+    // Remove old listeners by cloning, but we use named handlers attached via dataset flag
+    if (row.dataset.dragAttached) return;
+    row.dataset.dragAttached = '1';
     row.addEventListener('touchstart', onTouchStart, { passive: true });
   });
 }
 
 function onTouchStart(e) {
+  // Don't drag if tap is on chk, item-name, or tag (those have their own actions)
+  const target = e.target;
+  if (target.closest('.chk') || target.closest('.item-name') || target.closest('.item-tag') || target.closest('.item-unk')) return;
+
   const row = e.currentTarget;
   const t = e.touches[0];
   drag.startX = t.clientX;
@@ -669,52 +772,46 @@ function onTouchStart(e) {
   drag.fromZone = row.dataset.zone;
   drag.el = row;
 
-  // Start long-press timer
-  drag.holdTimer = setTimeout(() => {
-    startDrag(t);
-  }, 380);
+  drag.holdTimer = setTimeout(() => startDrag(e.touches[0]), 420);
 
   row.addEventListener('touchmove', onTouchMoveEarly, { passive: true });
   row.addEventListener('touchend', cancelHold, { once: true });
+  row.addEventListener('touchcancel', cancelHold, { once: true });
 }
 
 function onTouchMoveEarly(e) {
   const t = e.touches[0];
-  const dx = Math.abs(t.clientX - drag.startX);
-  const dy = Math.abs(t.clientY - drag.startY);
-  if (dx > 8 || dy > 8) cancelHold();
+  if (Math.abs(t.clientX - drag.startX) > 7 || Math.abs(t.clientY - drag.startY) > 7) {
+    cancelHold();
+  }
 }
 
 function cancelHold() {
   clearTimeout(drag.holdTimer);
+  drag.holdTimer = null;
   drag.el?.removeEventListener('touchmove', onTouchMoveEarly);
 }
 
 function startDrag(touch) {
+  if (!drag.el) return;
   drag.active = true;
   drag.el.classList.add('being-dragged');
+  if (navigator.vibrate) navigator.vibrate(35);
 
-  // Haptic if available
-  if (navigator.vibrate) navigator.vibrate(40);
-
-  // Show ghost
   const ghost = document.getElementById('drag-ghost');
-  ghost.textContent = drag.el.querySelector('.item-name').textContent;
+  ghost.textContent = drag.el.querySelector('.item-name')?.textContent || '';
   ghost.classList.add('show');
   positionGhost(touch.clientX, touch.clientY);
-  drag.ghost = ghost;
 
-  // Global move/end
   document.addEventListener('touchmove', onTouchMove, { passive: false });
   document.addEventListener('touchend', onTouchEnd, { once: true });
   document.addEventListener('touchcancel', onTouchEnd, { once: true });
 }
 
 function positionGhost(x, y) {
-  const g = drag.ghost;
-  if (!g) return;
+  const g = document.getElementById('drag-ghost');
   g.style.left = (x - g.offsetWidth / 2) + 'px';
-  g.style.top = (y - 24) + 'px';
+  g.style.top = (y - 28) + 'px';
 }
 
 function onTouchMove(e) {
@@ -723,42 +820,51 @@ function onTouchMove(e) {
   const t = e.touches[0];
   positionGhost(t.clientX, t.clientY);
 
-  // Find drop target zone
   document.querySelectorAll('.drop-active').forEach(el => el.classList.remove('drop-active'));
+  drag.lastDropZone = null;
+
+  // Hide ghost temporarily to hit-test underneath
+  const ghost = document.getElementById('drag-ghost');
+  ghost.style.display = 'none';
   const el = document.elementFromPoint(t.clientX, t.clientY);
+  ghost.style.display = '';
+
   const zoneBody = el?.closest('.zone-body');
   if (zoneBody) {
     const zid = zoneBody.dataset.zone;
     if (zid && zid !== '_done') {
       zoneBody.classList.add('drop-active');
       drag.lastDropZone = zid;
-    } else {
-      drag.lastDropZone = null;
     }
-  } else {
-    drag.lastDropZone = null;
   }
 }
 
-function onTouchEnd(e) {
-  if (!drag.active) return;
+function onTouchEnd() {
+  // Always remove global listeners first
   document.removeEventListener('touchmove', onTouchMove);
 
-  // Clean up ghost & drag state
-  drag.ghost?.classList.remove('show');
+  const ghost = document.getElementById('drag-ghost');
+  ghost.classList.remove('show');
+  ghost.style.display = '';
+
   document.querySelectorAll('.drop-active').forEach(el => el.classList.remove('drop-active'));
 
-  if (drag.lastDropZone && drag.lastDropZone !== drag.fromZone) {
-    moveToZone(Number(drag.itemId), drag.lastDropZone);
-  } else {
-    drag.el?.classList.remove('being-dragged');
-    render();
+  if (drag.active) {
+    if (drag.lastDropZone && drag.lastDropZone !== drag.fromZone) {
+      moveToZone(Number(drag.itemId), drag.lastDropZone);
+    } else {
+      drag.el?.classList.remove('being-dragged');
+    }
   }
 
+  // Full reset — prevents any stuck state
   drag.active = false;
   drag.itemId = null;
+  drag.fromZone = null;
   drag.el = null;
   drag.lastDropZone = null;
+  clearTimeout(drag.holdTimer);
+  drag.holdTimer = null;
 }
 
 /* ═══════════════════════════════════════════
